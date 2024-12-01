@@ -703,7 +703,7 @@ handle_mm_fault (struct pt_entry *pte)
       swap_in (pte->swap_slot, kpage->kaddr);
       success = install_page (pte->vaddr, kpage->kaddr, pte->writable);
     }
-
+ 
   /* If installation(frame-to-page mapping in 'real' 
      page table) is done, then set this page as 'loaded'. 
      If installation failed, then free that newly created frame. */
