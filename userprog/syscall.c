@@ -10,7 +10,7 @@
 #include "filesys/off_t.h"
 #include <stdbool.h>
 #include "threads/synch.h"
-#include "vm/mmap.h"
+// #include "vm/mmap.h"
 
 #define ARG_ADDR(k) ((uint8_t*)esp + 4*k)
 #define STACK_CHECK(vaddr, esp) if(!pt_find_entry (vaddr)) { if (!expand_stack (vaddr, esp)) exit (-1); }
@@ -39,10 +39,10 @@ void close(int fd);
 int filesize(int fd);
 void seek(int fd, off_t offset);
 off_t tell(int fd);
-mapid_t
-mmap (int fd, void *addr);
-void 
-munmap (mapid_t mapid);
+// mapid_t
+// mmap (int fd, void *addr);
+// void 
+// munmap (mapid_t mapid);
 
 
 //usermemoryaccess구현!
@@ -174,18 +174,18 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax=max_of_four_int((int)*(uint32_t*)(stack_pointer+4),(int)*(uint32_t*)(stack_pointer+8),(int)*(uint32_t*)(stack_pointer+12),(int)*(uint32_t*)(stack_pointer+16));
       break;
 
-    case SYS_MMAP:        /* Map a file into memory. */
-      check_address(stack_pointer+4);
-      check_address(stack_pointer+8);
-      USER_ADDR_CHECK(2, esp);
-      f->eax=mmap((int)*(uint32_t*)(stack_pointer+4),(void*)*(uint32_t*)(stack_pointer+8));
-      break;
+    // case SYS_MMAP:        /* Map a file into memory. */
+    //   check_address(stack_pointer+4);
+    //   check_address(stack_pointer+8);
+    //   USER_ADDR_CHECK(2, esp);
+    //   f->eax=mmap((int)*(uint32_t*)(stack_pointer+4),(void*)*(uint32_t*)(stack_pointer+8));
+    //   break;
 
-    case SYS_MUNMAP:      /* Remove a memory mapping. */
-      check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
-      munmap((mapid_t)*(uint32_t*)(stack_pointer+4));
-      break;
+    // case SYS_MUNMAP:      /* Remove a memory mapping. */
+    //   check_address(stack_pointer+4);
+    //   USER_ADDR_CHECK(1, esp);
+    //   munmap((mapid_t)*(uint32_t*)(stack_pointer+4));
+    //   break;
 
  
   }
@@ -419,17 +419,17 @@ off_t tell(int fd){
 
 /* Mmap routine: simply calls the function 'mm_mapping' that performs a 
    memory mapping. Yes, this function is declared in 'vm/mmap.h' file. */
-mapid_t
-mmap (int fd, void *addr)
-{
-  return mm_mapping (fd, addr);
-}
+// mapid_t
+// mmap (int fd, void *addr)
+// {
+//   return mm_mapping (fd, addr);
+// }
 
-/* Munmap routine: simply calls the function 'mm_freeing' just like the
-   mmap() above, and of course, it's declared in 'vm/mmap.h' file. */
+// /* Munmap routine: simply calls the function 'mm_freeing' just like the
+//    mmap() above, and of course, it's declared in 'vm/mmap.h' file. */
    
-void 
-munmap (mapid_t mapid)
-{
-  mm_freeing (mapid);
-}
+// void 
+// munmap (mapid_t mapid)
+// {
+//   mm_freeing (mapid);
+// }
