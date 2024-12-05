@@ -6,9 +6,8 @@
 
 struct list frame_list;
 struct list_elem *frame_clock;
-/* These six protected procedures are methods for managing the frame 
-   table in the pintOS system. I'm gonna call these functions as 
-   'frame table subroutines' sometimes in the comments below. */
+struct lock frame_lock;
+
 static void ft_insert_frame (struct frame *frame);
 static void ft_delete_frame (struct frame *frame);
 static struct frame *ft_find_frame (void *kaddr);
@@ -16,23 +15,12 @@ static struct list_elem *ft_clocking (void);
 static struct frame *ft_get_unaccessed_frame (void);
 static void ft_evict_frame (void);
 
-/* For the synchronization of accessing frame table. Note that when this 
-   mutex lock is used is not the beginning and end of each frame table 
-   subroutines, but the front and back of the call instruction of each 
-   subroutines, because interfaces that this header provides use those frame 
-   table subroutines in a nested fasion in some cases, which could cause a 
-   subtle synchronization error that can be detected by 'make check' via 
-   'lock_held_by_current_thread' assertion. Thus, remember this point.*/
-struct lock frame_lock;
-
-/* Initialize the frame table, binary semaphore, and iterator,
-   which are the crucial data structures for the replacement. */
 void 
 ft_init (void)
 {
-  frame_clock = NULL;
   list_init (&frame_list);
   lock_init (&frame_lock);
+  frame_clock = NULL;
 }
 
 /* It creates a new physical frame and initializes some metadata about 
