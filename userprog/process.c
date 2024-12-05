@@ -91,9 +91,6 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  //Page Table 생성
-  pt_init (&(thread_current ()->pt));
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -168,10 +165,9 @@ process_exit (void)
   uint32_t *pd;
   unsigned i;
 
-  ////////////
-  //for (i = 1; i < cur->mm_list_size; i++) munmap (i);
-
+  ///////////proj4///////////
   pt_destroy (&(cur->pt));
+  ///////////proj4///////////
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -304,6 +300,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
     goto done;
+
+  ///////////proj4///////////
+  pt_init (&(thread_current ()->pt));   //Page Table 생성
+  ///////////proj4///////////
+
   process_activate ();
 
   //parsing 진행
@@ -564,26 +565,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Create a page table entry for this, and push to the 
-         page table. Note that this is not a loading, this is
-         just constructing the page table only. (Lazy Loading) */
-      pte = pt_create_entry (upage, BINARY, writable, false,
-        file, ofs, page_read_bytes, page_zero_bytes);
-      if(pte == NULL) return false;
-
-      pt_insert_entry (&(thread_current ()->pt), pte);
-      
-      /* Advance. Note that the offset is updated. */
-      read_bytes -= page_read_bytes;
-      zero_bytes -= page_zero_bytes;
-      ofs += page_read_bytes;
-      upage += PGSIZE;
-      // /* Calculate how to fill this page.
-      //    We will read PAGE_READ_BYTES bytes from FILE
-      //    and zero the final PAGE_ZERO_BYTES bytes. */
-      // size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      // size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
       // /* Get a page of memory. */
       // uint8_t *kpage = palloc_get_page (PAL_USER);
       // if (kpage == NULL)
@@ -603,11 +584,22 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //     palloc_free_page (kpage);
       //     return false; 
       //   }
+      
+      /////proj4/////
+      struct pt_entry *tmp_pte = pt_alloc_entry();
+      if (tmp_pte == NULL) {
+        return NULL;
+      }
+      pt_init_entry(tmp_pte, upage, BINARY, writable, false, file, ofs, page_read_bytes, page_zero_bytes);
+      pte=tmp_pte;
+      pt_insert_entry (&(thread_current ()->pt), pte);
 
-      // /* Advance. */
-      // read_bytes -= page_read_bytes;
-      // zero_bytes -= page_zero_bytes;
-      // upage += PGSIZE;
+      /* Advance */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+      ofs += PGSIZE;
+      /////proj4/////
     }
   return true;
 }
@@ -617,53 +609,34 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  // uint8_t *kpage;
   struct frame *kpage;
   bool success = false;
 
-  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  // if (kpage != NULL) 
-  //   {
-  //     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-  //     if (success)
-  //       *esp = PHYS_BASE;
-  //     else
-  //       palloc_free_page (kpage);
-  //   }
   kpage = alloc_page (PAL_USER | PAL_ZERO);
+  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
-      /* Record this new frame to the 'read(non-supplemental)' page table.
-         And then, set the esp pointer value as recommended. */
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
       if (success) 
         {
           *esp = PHYS_BASE;
-
-          /* After installing pages for the stack segment, then 
-             create a page table entry for these pages and push 
-             it to the supplemental page table of current thread. */
-          kpage->pte = pt_create_entry (((uint8_t *)PHYS_BASE) - PGSIZE, 
-            SWAPPED, true, true, NULL, 0, 0, 0);
-          if (kpage->pte == NULL) return false;
-
+          /////proj4/////
+          struct pt_entry *tmp_pte = pt_alloc_entry();
+          if (tmp_pte == NULL) {
+            return NULL;
+          }
+          pt_init_entry(tmp_pte,((uint8_t *)PHYS_BASE) - PGSIZE, SWAPPED, true, true, NULL, 0, 0, 0);
+          kpage->pte=tmp_pte;
           pt_insert_entry (&(thread_current ()->pt), kpage->pte);
+          /////proj4/////
         }
       else
         free_page (kpage->kaddr);
+        // palloc_free_page (kpage);
     }
   return success;
 }
 
-/* Adds a mapping from user virtual address UPAGE to kernel
-   virtual address KPAGE to the page table.
-   If WRITABLE is true, the user process may modify the page;
-   otherwise, it is read-only.
-   UPAGE must not already be mapped.
-   KPAGE should probably be a page obtained from the user pool
-   with palloc_get_page().
-   Returns true on success, false if UPAGE is already mapped or
-   if memory allocation fails. */
 static bool
 install_page (void *upage, void *kpage, bool writable)
 {
@@ -674,6 +647,7 @@ install_page (void *upage, void *kpage, bool writable)
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
+
 
 bool 
 handle_mm_fault (struct pt_entry *pte)
@@ -744,14 +718,17 @@ expand_stack (void *addr, void *esp)
   if (kpage != NULL)
     {
       success = install_page (upage, kpage->kaddr, true);
-      if (success)
-        {
-          kpage->pte = pt_create_entry (upage, SWAPPED, true, true,
-            NULL, 0, 0, 0);
-          if (kpage->pte == NULL) return false;
-
-          pt_insert_entry (&(thread_current ()->pt), kpage->pte);
+      if (success){
+        /////proj4/////
+        struct pt_entry *tmp_pte = pt_alloc_entry();
+        if (tmp_pte == NULL) {
+          return NULL;
         }
+        pt_init_entry(tmp_pte, upage, SWAPPED, true, true, NULL, 0, 0, 0);
+        kpage->pte=tmp_pte;
+        pt_insert_entry (&(thread_current ()->pt), kpage->pte);
+        /////proj4/////
+      }
       else
         free_page (kpage->kaddr);
     }

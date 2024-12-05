@@ -129,7 +129,6 @@ page_fault (struct intr_frame *f)
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
-  struct pt_entry *pte;  /* If faulting address is from a present page. */
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -152,15 +151,15 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
-
   /* If the frame of faulting address is present, then 
      it's an abnormal accessing situation, so terminate! */
   if (!not_present) 
     exit (-1);
 
   /* If not, get the PTE of faulting address, and analyze. */
-  pte = pt_find_entry (fault_addr);
+  struct pt_entry *pte = pt_find(&thread_current()->pt,fault_addr);
+
+
   /* (1) If it's not a valid reference, then check if it's in
      a growable region. If yes, expand the user stack. */
   if (!pte)
@@ -176,20 +175,15 @@ page_fault (struct intr_frame *f)
          exit(-1);
     }
   }
-
-  // /* Determine cause. */
-  // not_present = (f->error_code & PF_P) == 0;
-  // write = (f->error_code & PF_W) != 0;
-  // user = (f->error_code & PF_U) != 0;
-
-  //  //sc-bad-sp 출력 : user가 kernel영역 참조할 경우 exit -1
-  //  //user program이 커널 영역 접근 한 경우 예외처리
-  // if (!user || is_kernel_vaddr(fault_addr)|| not_present) {
-  //   exit(-1);
-  // }
  
   // /* To implement virtual memory, delete the rest of the function
   //    body, and replace it with code that brings in the page to
   //    which fault_addr refers. */  
+//   printf ("Page fault at %p: %s error %s page in %s context.\n",
+//           fault_addr,
+//           not_present ? "not present" : "rights violation",
+//           write ? "writing" : "reading",
+//           user ? "user" : "kernel");
+//   kill (f);
 }
 

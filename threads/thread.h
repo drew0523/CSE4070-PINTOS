@@ -124,9 +124,6 @@ struct thread
 
    //proj4 구현
     struct hash pt;
-    struct list mm_list;                /* List of loaded-by-mmap files. */
-    unsigned mm_list_size;              /* Number of mmapped files. */
-
 #endif
 
    // struct semaphore wait_for_load;

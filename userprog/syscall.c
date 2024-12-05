@@ -10,7 +10,6 @@
 #include "filesys/off_t.h"
 #include <stdbool.h>
 #include "threads/synch.h"
-// #include "vm/mmap.h"
 
 struct lock TOTAL_LOCK;
 
@@ -155,21 +154,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_address(stack_pointer+16);
       f->eax=max_of_four_int((int)*(uint32_t*)(stack_pointer+4),(int)*(uint32_t*)(stack_pointer+8),(int)*(uint32_t*)(stack_pointer+12),(int)*(uint32_t*)(stack_pointer+16));
       break;
-
-    // case SYS_MMAP:        /* Map a file into memory. */
-    //   check_address(stack_pointer+4);
-    //   check_address(stack_pointer+8);
-    //   USER_ADDR_CHECK(2, esp);
-    //   f->eax=mmap((int)*(uint32_t*)(stack_pointer+4),(void*)*(uint32_t*)(stack_pointer+8));
-    //   break;
-
-    // case SYS_MUNMAP:      /* Remove a memory mapping. */
-    //   check_address(stack_pointer+4);
-    //   USER_ADDR_CHECK(1, esp);
-    //   munmap((mapid_t)*(uint32_t*)(stack_pointer+4));
-    //   break;
-
- 
   }
 }
 
@@ -214,7 +198,6 @@ int wait(tid_t pid){
 //fd에서 size만큼 읽어와서 buffer에 저장
 int read(int fd, void *buffer, unsigned int size){
   check_address(buffer);
-  
   ///////////////////////////
   lock_acquire(&TOTAL_LOCK);
   ///////////////////////////
@@ -398,20 +381,3 @@ off_t tell(int fd){
   }
   return file_tell(t->file_table[fd]);
 }
-
-/* Mmap routine: simply calls the function 'mm_mapping' that performs a 
-   memory mapping. Yes, this function is declared in 'vm/mmap.h' file. */
-// mapid_t
-// mmap (int fd, void *addr)
-// {
-//   return mm_mapping (fd, addr);
-// }
-
-// /* Munmap routine: simply calls the function 'mm_freeing' just like the
-//    mmap() above, and of course, it's declared in 'vm/mmap.h' file. */
-   
-// void 
-// munmap (mapid_t mapid)
-// {
-//   mm_freeing (mapid);
-// }
