@@ -41,18 +41,6 @@ void pt_init_entry(struct pt_entry *pte, void *vaddr, pt_type type, bool writabl
   pte->zero_bytes = zero_bytes;
 }
 
-struct pt_entry* pt_create_entry(void *vaddr, pt_type type, bool writable, bool is_loaded,
- struct file *file, size_t offset, size_t read_bytes, size_t zero_bytes)
-{
-  struct pt_entry *pte = pt_alloc_entry();
-  if (pte == NULL) {
-    return NULL;
-  }
-
-  pt_init_entry(pte, vaddr, type, writable, is_loaded, file, offset, read_bytes, zero_bytes);
-  return pte;
-}
-
 bool 
 pt_insert_entry (struct hash *pt, struct pt_entry *pte)
 {

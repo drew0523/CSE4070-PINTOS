@@ -32,7 +32,6 @@ static bool pt_hash_less (const struct hash_elem*, const struct hash_elem*, void
 void pt_init (struct hash*);
 struct pt_entry* pt_alloc_entry(void);
 void pt_init_entry(struct pt_entry*, void*, pt_type, bool, bool, struct file*, size_t, size_t, size_t);
-struct pt_entry* pt_create_entry(void*, pt_type, bool, bool, struct file*, size_t, size_t, size_t);
 bool pt_insert_entry (struct hash*, struct pt_entry*);
 struct pt_entry* pt_find(struct hash*, void*);
 static void pt_destroy_func (struct hash_elem *, void*);

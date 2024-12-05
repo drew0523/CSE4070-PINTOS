@@ -8,13 +8,6 @@ struct list frame_list;
 struct list_elem *frame_clock;
 struct lock frame_lock;
 
-static void ft_insert_frame (struct frame *frame);
-static void ft_delete_frame (struct frame *frame);
-static struct frame *ft_find_frame (void *kaddr);
-static struct list_elem *ft_clocking (void);
-static struct frame *ft_get_unaccessed_frame (void);
-static void ft_evict_frame (void);
-
 void 
 ft_init (void)
 {
@@ -43,13 +36,6 @@ struct frame *alloc_page (enum palloc_flags flags)
   return page;
 }
 
-/* It frees a frame indicated by the passed physical address. That is,
-   remove it from the frame table, from the page directory, and deallocate
-   it. During this procedure, there should be a mutual exclusion.
-
-   * ALERT: Note that the pintOS usually calls '(physical) frame' just
-     as 'page'. Thus, a word 'page' in here is in fact a 'frame'. We should
-     keep in mind it when read the below codes. */
 void 
 free_page (void *kaddr)
 {
@@ -74,28 +60,6 @@ free_page (void *kaddr)
     lock_release(&frame_lock);
 }
 
-
-/* Load a file from the disk onto the physical memory. After loading,
-   the remaining part of the given frame will be set to zero. */
-bool 
-load_file_to_page (void *kaddr, struct pt_entry *pte)
-{
-  bool success; 
-
-  /* Read(load) the file onto the memory. */
-  size_t read_byte = pte->read_bytes;
-  size_t temp = (size_t)file_read_at (pte->file, 
-    kaddr, pte->read_bytes, pte->offset);
-  
-  /* Set all the remaining bytes of that frame to zero,
-     only if the file read operation was successful. */
-  success = (read_byte == temp);
-  if (success)
-    memset (kaddr + pte->read_bytes, 0, pte->zero_bytes);
-
-  return success;
-}
-
 static struct list_elem* ft_clocking (void)
 {
   /* If the iterator reaches the end of the list, then get 
@@ -117,10 +81,6 @@ static struct list_elem* ft_clocking (void)
   return frame_clock;
 }
 
-/* Get the first unaccessed frame from the frame table, based on 
-   the LRU(Least Recently Used) policy. To implement this policy,
-   we can use some useful functions defined in the 'pagedir.h',
-   which provides routines to check accesses of given page(frame). */
 static struct frame* ft_get_unaccessed_frame (void)
 {
   int n = list_size(&frame_list);
@@ -139,12 +99,6 @@ static struct frame* ft_get_unaccessed_frame (void)
   }
 }
 
-/* If there's a need for eviction of the frame, then search the unaccessed
-   frame from the frame table with clock algorithm. After find it, then
-   check the dirtiness of that frame and the type of the mapped PTE, and
-   perform the corresponding routine for the dirtiness and the type.
-   (Therefore, this routine uses an approximate LRU(Least Recently Used) 
-   algorithm) */
 static void ft_evict_frame (void)
 {
   struct frame *frame;
@@ -167,5 +121,25 @@ static void ft_evict_frame (void)
 
   free (frame);
 }
-/* Delete the list entry(frame) from the frame table. The target 
-   frame must be equal to the current global clock iterator. */
+
+
+/* Load a file from the disk onto the physical memory. After loading,
+   the remaining part of the given frame will be set to zero. */
+bool 
+load_file_to_page (void *kaddr, struct pt_entry *pte)
+{
+  bool success; 
+
+  /* Read(load) the file onto the memory. */
+  size_t read_byte = pte->read_bytes;
+  size_t temp = (size_t)file_read_at (pte->file, 
+    kaddr, pte->read_bytes, pte->offset);
+  
+  /* Set all the remaining bytes of that frame to zero,
+     only if the file read operation was successful. */
+  success = (read_byte == temp);
+  if (success)
+    memset (kaddr + pte->read_bytes, 0, pte->zero_bytes);
+
+  return success;
+}

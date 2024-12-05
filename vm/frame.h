@@ -17,11 +17,12 @@ struct frame
 extern struct list frame_list;
 extern struct list_elem *frame_clock;
 
-static void ft_insert_frame (struct frame *frame);
-static void ft_delete_frame (struct frame *frame);
-static struct frame *ft_find_frame (void *kaddr);
-static struct list_elem *ft_clocking (void);
-static struct frame *ft_get_unaccessed_frame (void);
+void ft_init (void);
+struct frame *alloc_page (enum palloc_flags);
+void free_page (void*);
+static struct list_elem* ft_clocking (void);
+static struct frame* ft_get_unaccessed_frame (void);
 static void ft_evict_frame (void);
+bool load_file_to_page (void*, struct pt_entry*);
 
 #endif
