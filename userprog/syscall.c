@@ -12,10 +12,6 @@
 #include "threads/synch.h"
 // #include "vm/mmap.h"
 
-#define ARG_ADDR(k) ((uint8_t*)esp + 4*k)
-#define STACK_CHECK(vaddr, esp) if(!pt_find_entry (vaddr)) { if (!expand_stack (vaddr, esp)) exit (-1); }
-#define USER_ADDR_CHECK(param_num, esp) for(int i=1;i<=param_num;i++){ STACK_CHECK(ARG_ADDR(i), esp); }
-
 struct lock TOTAL_LOCK;
 
 static void syscall_handler (struct intr_frame *);
@@ -79,46 +75,39 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_EXIT:  //1
       //printf("SYS_EXIT!!\n");
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       exit(*(uint32_t*)(stack_pointer+4));
       break;
     
     case SYS_EXEC:  //2
       //printf("SYS_EXEC!!\n");
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=exec((const char*)*(uint32_t*)(stack_pointer+4));
       break;
     
     case SYS_WAIT:  //3
       //printf("SYS_WAIT!!\n");
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=wait(*(uint32_t*)(stack_pointer+4));
       break;
 
     case SYS_CREATE:  //4
       check_address(stack_pointer+4);
       check_address(stack_pointer+8);
-      USER_ADDR_CHECK(2, esp);
       f->eax=create((const char*)*(uint32_t*)(stack_pointer+4),*(uint32_t*)(stack_pointer+8));
       break;
 
     case SYS_REMOVE:  //5
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=remove((const char*)*(uint32_t*)(stack_pointer+4));
       break;
 
     case SYS_OPEN:  //6
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=open((const char*)*(uint32_t*)(stack_pointer+4));
       break;
 
     case SYS_FILESIZE:  //7
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=filesize((int)*(uint32_t*)(stack_pointer+4));
       break;
 
@@ -127,7 +116,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_address(stack_pointer+4);
       check_address(stack_pointer+8);
       check_address(stack_pointer+12);
-      USER_ADDR_CHECK(3, esp);
       f->eax=read((int)*(uint32_t*)(stack_pointer+4),(void*)*(uint32_t*)(stack_pointer+8),(unsigned int)*(uint32_t*)(stack_pointer+12));
       break;
 
@@ -136,32 +124,27 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_address(stack_pointer+4);
       check_address(stack_pointer+8);
       check_address(stack_pointer+12);
-      USER_ADDR_CHECK(3, esp);
       f->eax=write((int)*(uint32_t*)(stack_pointer+4),(void*)*(uint32_t*)(stack_pointer+8),(unsigned int)*(uint32_t*)(stack_pointer+12));
       break;
 
     case SYS_SEEK:  //10
       check_address(stack_pointer+4);
       check_address(stack_pointer+8);
-      USER_ADDR_CHECK(2, esp);
       seek((int)*(uint32_t*)(stack_pointer+4),*(uint32_t*)(stack_pointer+8));
       break;
 
     case SYS_TELL:  //11
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=tell((int)*(uint32_t*)(stack_pointer+4));
       break;
 
     case SYS_CLOSE: //12
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       close((int)*(uint32_t*)(stack_pointer+4));
       break;
 
     case SYS_FIBONACCI:
       check_address(stack_pointer+4);
-      USER_ADDR_CHECK(1, esp);
       f->eax=fibonacci((int)*(uint32_t*)(stack_pointer+4));
       break;
 
@@ -170,7 +153,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_address(stack_pointer+8);
       check_address(stack_pointer+12);
       check_address(stack_pointer+16);
-      USER_ADDR_CHECK(4, esp);
       f->eax=max_of_four_int((int)*(uint32_t*)(stack_pointer+4),(int)*(uint32_t*)(stack_pointer+8),(int)*(uint32_t*)(stack_pointer+12),(int)*(uint32_t*)(stack_pointer+16));
       break;
 
