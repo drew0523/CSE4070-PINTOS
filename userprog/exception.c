@@ -2,11 +2,15 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include <stdlib.h>
 #include "vm/page.h"
+#include "vm/frame.h"
+
+#define MAX_STACK_SIZE 0x8000000
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -151,34 +155,63 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* If the frame of faulting address is present, then 
-     it's an abnormal accessing situation, so terminate! */
   if (!not_present) 
     exit (-1);
 
-  /* If not, get the PTE of faulting address, and analyze. */
-  struct pt_entry *pte = pt_find(&thread_current()->pt,fault_addr);
+   //pte가 없다 : expand stack or segfault
+   //pte가 있다 : 일반적인 pagefault
+   struct pt_entry *pte = supt_find(&thread_current()->sup_page_table, fault_addr);
 
+   // Case 1: stack growth or segfault
+   if (pte == NULL) {
+      // check if stack growth
+      if (is_user_vaddr(fault_addr) && 
+         fault_addr >= (PHYS_BASE - MAX_STACK_SIZE) &&
+         fault_addr >= (f->esp - 32)) {
+         
+         void *upage = pg_round_down(fault_addr);
+         struct frame *kpage = alloc_frame(PAL_USER | PAL_ZERO);
 
-  /* (1) If it's not a valid reference, then check if it's in
-     a growable region. If yes, expand the user stack. */
-  if (!pte)
-  {
-    if (!expand_stack (fault_addr, f->esp))
-      exit (-1);
-  }
-  /* (2) If it's a valid reference, then get an available frame.
-     'handle_mm_fault' function in process.c will do this. */
-  else
-  {
-    if (!handle_mm_fault (pte)){
+         if (kpage != NULL && install_page(upage, kpage->kaddr, true)) {
+               //expand stack
+               struct pt_entry *tmp_pte = supt_entry_alloc();
+               if (tmp_pte == NULL) {
+                  free_frame(kpage->kaddr);
+                  return NULL;
+               }
+               //stack은 swap영역.
+               supt_entry_init(tmp_pte, upage, ON_SWAP, true, true, NULL, 0, 0, 0);
+               kpage->pte = tmp_pte;
+               supt_insert(&thread_current()->sup_page_table, kpage->pte);
+         } else {
+               if (kpage != NULL) free_frame(kpage->kaddr);
+               exit(-1);
+         }
+      } else {
+         exit(-1); // segfault
+      }
+   } 
+   // Case 2: 일반적인 pagefault
+   else {
+      struct frame *kpage = alloc_frame(PAL_USER);
+      if (kpage == NULL) {
          exit(-1);
-    }
-  }
- 
-  // /* To implement virtual memory, delete the rest of the function
-  //    body, and replace it with code that brings in the page to
-  //    which fault_addr refers. */  
+      }
+      kpage->pte = pte;
+
+      if (pte->type == ON_FILE) {
+         load_file(kpage->kaddr, pte);    //BINARY FILE에서 load해오기
+      } else if (pte->type == ON_SWAP) {
+         swap_in(pte->slot_idx, kpage->kaddr);  //Swap 영역에서 load
+      }
+
+      if (install_page(pte->vaddr, kpage->kaddr, pte->writable)) {
+         pte->is_loaded = true;
+      } else {
+         free_frame(kpage->kaddr);
+         exit(-1);
+      }
+   }
 //   printf ("Page fault at %p: %s error %s page in %s context.\n",
 //           fault_addr,
 //           not_present ? "not present" : "rights violation",

@@ -119,12 +119,12 @@ main (void)
   syscall_init ();
 #endif
 
-  //proj4
-  /* Initialize the frame table of the system. */
-  ft_init ();
-  /* Initialize the swap table of the system. */
-  swap_init ();
-  //////
+#ifdef VM
+  //proj4//
+  swap_table_init ();
+  frame_pool_init ();
+  ////////
+#endif
 
   /* Start thread scheduler and enable interrupts. */
   thread_start ();

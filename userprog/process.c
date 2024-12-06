@@ -163,11 +163,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  unsigned i;
-
-  ///////////proj4///////////
-  pt_destroy (&(cur->pt));
-  ///////////proj4///////////
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -185,6 +180,13 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    
+  ///////////proj4///////////
+  if (!hash_empty(&(cur->sup_page_table))){   //sup page table 제거
+    supt_destroy(&(cur->sup_page_table));
+  }
+  ///////////proj4///////////
+
   //printf("EXIT111\n");
   //printf("semaphore2: %d!!!\n", cur->child_lock.value);
   //자식이 종료하면서 wait_for_child 1로 증가 따라서 부모 프로세스 작동
@@ -302,7 +304,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
 
   ///////////proj4///////////
-  pt_init (&(thread_current ()->pt));   //Page Table 생성
+  supt_init (&(thread_current ()->sup_page_table));   //sup Page Table 생성
   ///////////proj4///////////
 
   process_activate ();
@@ -488,7 +490,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
+bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -586,13 +588,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //   }
       
       /////proj4/////
-      struct pt_entry *tmp_pte = pt_alloc_entry();
+      //lazy loading: 물리 프레임을 할당하지 않고 page table entry만 생성.(X install page)
+      //사용할 때 pagefault handler에서 load해옴
+      struct pt_entry *tmp_pte = supt_entry_alloc();  
       if (tmp_pte == NULL) {
         return NULL;
       }
-      pt_init_entry(tmp_pte, upage, BINARY, writable, false, file, ofs, page_read_bytes, page_zero_bytes);
+      supt_entry_init(tmp_pte, upage, ON_FILE, writable, false, file, ofs, page_read_bytes, page_zero_bytes);
       pte=tmp_pte;
-      pt_insert_entry (&(thread_current ()->pt), pte);
+      supt_insert (&(thread_current ()->sup_page_table), pte);
 
       /* Advance */
       read_bytes -= page_read_bytes;
@@ -607,37 +611,33 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack(void **esp)
 {
-  struct frame *kpage;
-  bool success = false;
-
-  kpage = alloc_page (PAL_USER | PAL_ZERO);
-  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
-      if (success) 
-        {
-          *esp = PHYS_BASE;
-          /////proj4/////
-          struct pt_entry *tmp_pte = pt_alloc_entry();
-          if (tmp_pte == NULL) {
-            return NULL;
-          }
-          pt_init_entry(tmp_pte,((uint8_t *)PHYS_BASE) - PGSIZE, SWAPPED, true, true, NULL, 0, 0, 0);
-          kpage->pte=tmp_pte;
-          pt_insert_entry (&(thread_current ()->pt), kpage->pte);
-          /////proj4/////
-        }
-      else
-        free_page (kpage->kaddr);
-        // palloc_free_page (kpage);
+    struct frame *kpage = alloc_frame(PAL_USER | PAL_ZERO); //물리 frame 할당
+    if (kpage == NULL) {
+        return false;
     }
-  return success;
+
+    void *upage = ((uint8_t *)PHYS_BASE) - PGSIZE;
+    if (!install_page(upage, kpage->kaddr, true)) {
+        free_frame(kpage->kaddr); // 물리 frame mapping 실패: 해제
+        return false;
+    }
+
+    *esp = PHYS_BASE;
+    struct pt_entry *tmp_pte = supt_entry_alloc();
+    if (tmp_pte == NULL) {
+        free_frame(kpage->kaddr);
+        return false;
+    }
+    //frame-vm mapping 성공: page table에 삽입
+    supt_entry_init(tmp_pte, upage, ON_SWAP, true, true, NULL, 0, 0, 0);  //stack은 동적 memory: swap 영역 (freex)
+    kpage->pte = tmp_pte;
+    supt_insert(&(thread_current()->sup_page_table), tmp_pte);
+    return true;
 }
 
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
@@ -646,92 +646,4 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
-
-
-bool 
-handle_mm_fault (struct pt_entry *pte)
-{
-  struct frame *kpage;
-  bool success = false;
-
-  /* Allocate a new physical frame and map to the passed PTE.
-     This frame possibly replaces the original virtual page.*/
-  kpage = alloc_page (PAL_USER);
-  kpage->pte = pte;
-
-  /* What is a type of the virtual page of the faulting address?
-      --> here are two cases by type of page, just like below. 
-     (1) If it's the binary file or the mmapped file, then simply
-       load related data from the same file in the disk-side.*/
-  if (pte->type == BINARY || pte->type == MAPPED)
-    {
-      if (load_file_to_page (kpage->kaddr, pte))
-        success = install_page (pte->vaddr, kpage->kaddr, pte->writable);
-    }
-
-  /* (2) If it's the page that are from the swap space but not in
-       the memory right now, just swapping in that frame. Note that in 
-       both cases we just install the newly created frame into system. */
-  else if (pte->type == SWAPPED)
-    { 
-      swap_in (pte->swap_slot, kpage->kaddr);
-      success = install_page (pte->vaddr, kpage->kaddr, pte->writable);
-    }
-
-  /* If installation(frame-to-page mapping in 'real' 
-     page table) is done, then set this page as 'loaded'. 
-     If installation failed, then free that newly created frame. */
-  if (success) 
-    pte->is_loaded = true;
-  else 
-    free_page (kpage->kaddr);
-
-  return success;
-  /* If it reaches here with success == true, then the loading is successful.
-     Thus, 'page_fault()' will return properly, and the system will execute
-     the faulting instruction once again. (fault exception handling) */
-}
-
-bool 
-expand_stack (void *addr, void *esp)
-{
-  void *upage;
-  struct frame *kpage;
-  bool success = false;
-  
-  /* Is it OK to expand the stack in this case? That is, check if the 
-     faulting address can be within the 8MB range from the current stack 
-     pointer address, and whether it's from the user-virtual area, and 
-     qualify the PUSHA condition also. All these 3 checks should be passed. */
-  if (!is_user_vaddr (addr)) return false;
-  if (addr < (PHYS_BASE - MAX_STACK_SIZE)) return false;
-  if (addr < (esp - 32)) return false;
-  
-  /* Get the nearest page boudary, to 'upage'. */
-  upage = pg_round_down (addr);
-
-  /* If the previous checking was successful, then expand 
-     the stack just like the way we set up the stack, except
-     for the setting routine of the esp pointer. */
-  kpage = alloc_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-    {
-      success = install_page (upage, kpage->kaddr, true);
-      if (success){
-        /////proj4/////
-        struct pt_entry *tmp_pte = pt_alloc_entry();
-        if (tmp_pte == NULL) {
-          return NULL;
-        }
-        pt_init_entry(tmp_pte, upage, SWAPPED, true, true, NULL, 0, 0, 0);
-        kpage->pte=tmp_pte;
-        pt_insert_entry (&(thread_current ()->pt), kpage->pte);
-        /////proj4/////
-      }
-      else
-        free_page (kpage->kaddr);
-    }
-
-  return success; 
 }

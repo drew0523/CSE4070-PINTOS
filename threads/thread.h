@@ -121,11 +121,11 @@ struct thread
     int load_flag;   //load check
     struct semaphore wait_for_load;
     struct file* currently_running_file;  //Denying Writes to Executable files
-
-   //proj4 구현
-    struct hash pt;
 #endif
-
+#ifdef VM
+   //proj4 구현 sup page table
+    struct hash sup_page_table;
+#endif
    // struct semaphore wait_for_load;
    // //file descriptor 구현 proj2    
    // struct file* file_table[128];

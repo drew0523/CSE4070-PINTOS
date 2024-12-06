@@ -34,11 +34,6 @@ void close(int fd);
 int filesize(int fd);
 void seek(int fd, off_t offset);
 off_t tell(int fd);
-// mapid_t
-// mmap (int fd, void *addr);
-// void 
-// munmap (mapid_t mapid);
-
 
 //usermemoryaccess구현!
 void check_address(void* vaddr){
@@ -48,7 +43,6 @@ void check_address(void* vaddr){
     exit(-1);
   }
 }
-
 
 void
 syscall_init (void) 
