@@ -68,6 +68,6 @@ static void supt_destroy_func (struct hash_elem *h_elem, void *aux UNUSED)
 
 //process_exit 시 supt 삭제(메모리 누수 방지)
 void supt_destroy (struct hash *supt)
-{
+{ 
   hash_destroy (supt, supt_destroy_func);
 }

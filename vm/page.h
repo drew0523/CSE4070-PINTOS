@@ -22,7 +22,7 @@ struct pt_entry
   size_t offset;           //file offset
   size_t read_bytes;            
   size_t zero_bytes;         
-};
+}; 
 
 void supt_init (struct hash*);
 struct pt_entry* supt_entry_alloc(void);
